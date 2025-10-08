@@ -1,0 +1,12 @@
+accelerate launch --num_cpu_threads_per_process 1 --mixed_precision fp16 src/musubi_tuner/wan_train_network.py \
+  --task t2v-A14B \
+  --dit models/wan2.2/diffusion_models/wan2.2_t2v_low_noise_14B_fp16.safetensors \
+  --dataset_config dataset/avatar1_wan2.2.toml --sdpa --mixed_precision fp16 --fp8_base \
+  --optimizer_type adamw8bit --learning_rate 2e-4 --gradient_checkpointing \
+  --max_data_loader_n_workers 2 --persistent_data_loader_workers \
+  --network_module networks.lora_wan --network_dim 32 \
+  --timestep_sampling shift --discrete_flow_shift 8.0 \
+  --max_train_epochs 300 --save_every_n_epochs 10 --seed 42 \
+  --output_dir output --output_name avatar1_wan2.2_v1 --blocks_to_swap 20 \
+  --min_timestep 0 --max_timestep 875 \
+  --preserve_distribution_shape
