@@ -78,6 +78,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--offload_inactive_dit", action="store_true", help="Offload DiT model to CPU")
     parser.add_argument("--lazy_loading", action="store_true", help="Enable lazy loading for DiT models")
+    parser.add_argument(
+        "--disable_numpy_memmap", action="store_true", help="Disable numpy memmap when loading safetensors. Default is False."
+    )
     parser.add_argument("--vae", type=str, default=None, help="VAE checkpoint path")
     parser.add_argument("--vae_dtype", type=str, default=None, help="data type for VAE, default is bfloat16")
     parser.add_argument("--vae_cache_cpu", action="store_true", help="cache features in VAE on CPU")
@@ -211,6 +214,11 @@ def parse_args() -> argparse.Namespace:
         help="attention mode",
     )
     parser.add_argument("--blocks_to_swap", type=int, default=0, help="number of blocks to swap in the model")
+    parser.add_argument(
+        "--use_pinned_memory_for_block_swap",
+        action="store_true",
+        help="use pinned memory for block swapping, which may speed up data transfer between CPU and GPU but uses more shared GPU memory on Windows",
+    )
     parser.add_argument(
         "--output_type",
         type=str,
@@ -645,6 +653,7 @@ def load_dit_model(
         lora_weights_list=lora_weights_list,
         lora_multipliers=lora_multipliers,
         use_scaled_mm=args.fp8_fast,
+        disable_numpy_memmap=args.disable_numpy_memmap,
     )
     if args.force_v2_1_time_embedding:
         model.set_time_embedding_v2_1(True)
@@ -711,7 +720,9 @@ def load_dit_model(
 
     if args.blocks_to_swap > 0:
         logger.info(f"Enable swap {args.blocks_to_swap} blocks to CPU from device: {device}")
-        model.enable_block_swap(args.blocks_to_swap, device, supports_backward=False)
+        model.enable_block_swap(
+            args.blocks_to_swap, device, supports_backward=False, use_pinned_memory=args.use_pinned_memory_for_block_swap
+        )
         model.move_to_device_except_swap_blocks(device)
         model.prepare_block_swap_before_forward()
     else:

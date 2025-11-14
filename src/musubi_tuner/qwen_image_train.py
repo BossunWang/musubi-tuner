@@ -63,7 +63,14 @@ class QwenImageTrainer(QwenImageNetworkTrainer):
         if "-00001-of-00" in dit_path:
             logger.info("Pruned model detection is disabled because the weights are split into multiple files.")
             model = qwen_image_model.load_qwen_image_model(
-                accelerator.device, dit_path, attn_mode, split_attn, loading_device, dit_weight_dtype, args.fp8_scaled
+                accelerator.device,
+                dit_path,
+                attn_mode,
+                split_attn,
+                loading_device,
+                dit_weight_dtype,
+                args.fp8_scaled,
+                disable_numpy_memmap=args.disable_numpy_memmap,
             )
             return model
 
@@ -88,11 +95,18 @@ class QwenImageTrainer(QwenImageNetworkTrainer):
         # load weights from disk
         logger.info(f"Loading weights from {dit_path}")
         if block_index_map is None:
-            state_dict = load_safetensors(dit_path, device=loading_device, disable_mmap=True, dtype=dit_weight_dtype)
+            # uses official safetensors loader
+            state_dict = load_safetensors(
+                dit_path,
+                device=loading_device,
+                disable_mmap=True,
+                dtype=dit_weight_dtype,
+                disable_numpy_memmap=args.disable_numpy_memmap,
+            )
         else:
             loading_device = torch.device(loading_device) if loading_device is not None else None
             state_dict = {}
-            with MemoryEfficientSafeOpen(dit_path) as f:
+            with MemoryEfficientSafeOpen(dit_path, disable_numpy_memmap=args.disable_numpy_memmap) as f:
                 for key in f.keys():
                     state_dict_key = key
                     if key.startswith("transformer_blocks."):
@@ -215,7 +229,9 @@ class QwenImageTrainer(QwenImageNetworkTrainer):
 
         if blocks_to_swap > 0:
             logger.info(f"enable swap {blocks_to_swap} blocks to CPU from device: {accelerator.device}")
-            transformer.enable_block_swap(blocks_to_swap, accelerator.device, supports_backward=True)
+            transformer.enable_block_swap(
+                blocks_to_swap, accelerator.device, supports_backward=True, use_pinned_memory=args.use_pinned_memory_for_block_swap
+            )
             transformer.move_to_device_except_swap_blocks(accelerator.device)
 
         if args.gradient_checkpointing:
@@ -478,13 +494,14 @@ class QwenImageTrainer(QwenImageNetworkTrainer):
                 self.architecture,
                 time.time(),
                 title,
-                None,
+                args.metadata_reso,
                 args.metadata_author,
                 args.metadata_description,
                 args.metadata_license,
                 args.metadata_tags,
                 timesteps=md_timesteps,
                 is_lora=False,
+                custom_arch=args.metadata_arch,
             )
 
             metadata_to_save.update(sai_metadata)
