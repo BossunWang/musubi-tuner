@@ -1,0 +1,18 @@
+# resolution, caption_extension, batch_size, num_repeats, enable_bucket, bucket_no_upscale should be set in either general or datasets
+# otherwise, the default values will be used for each item
+
+# general configurations
+[general]
+resolution = [720, 544]
+caption_extension = ".txt"
+batch_size = 1
+enable_bucket = true
+bucket_no_upscale = false
+
+[[datasets]]
+video_directory = "dataset/twice_onespark"
+cache_directory = "dataset/twice_onespark_cache" # optional, default is None. If set, the dataset will be cached in this directory to speed up the training.
+frame_extraction = "full"
+max_frames = 45
+
+# other datasets can be added here. each dataset can have different configurations
